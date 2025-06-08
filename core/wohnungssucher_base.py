@@ -1,6 +1,10 @@
+import re
 import sys
 from abc import abstractmethod
 
+import requests
+
+from core.HtmlDecoder import HtmlDocument
 from core.apartment import Apartment
 from core.utils import BoolPlus
 
@@ -33,7 +37,53 @@ class WohnungssucherBase:
 
     exchange_apartment: BoolPlus
 
-    def __init__(
+    default_zip: bool
+    default_place: bool
+    default_rent_cold: bool
+    default_rent_warm: bool
+    default_room: bool
+    default_apartment_size: bool
+    default_floor: bool
+    default_energy_efficiency_class: bool
+    default_year_of_construction: bool
+    default_exchange_apartment: bool
+
+    def __init__(self, config: dict, defaults: dict):
+        self.set_configurations(
+            url_platform=config['url_platform'],
+            zips_included=config['zips_included'],
+            zips_excluded=config['zips_excluded'],
+            places_included=config['places_included'],
+            places_excluded=config['places_excluded'],
+            rent_cold_min=config['rent_cold_min'],
+            rent_cold_max=config['rent_cold_max'],
+            rent_warm_min=config['rent_warm_min'],
+            rent_warm_max=config['rent_warm_max'],
+            rooms_min=config['rooms_min'],
+            rooms_max=config['rooms_max'],
+            apartment_size_min=config['apartment_size_min'],
+            apartment_size_max=config['apartment_size_max'],
+            floors=config['floors'],
+            energy_efficiency_classes=config['energy_efficiency_classes'],
+            year_of_construction_min=config['year_of_construction_min'],
+            year_of_construction_max=config['year_of_construction_max'],
+            exchange_apartment=config['exchange_apartment']
+        )
+
+        self.set_defaults(
+            zip=defaults['zip'],
+            place=defaults['place'],
+            rent_cold=defaults['rent_cold'],
+            rent_warm=defaults['rent_warm'],
+            room=defaults['room'],
+            apartment_size=defaults['apartment_size'],
+            floor=defaults['floor'],
+            energy_efficiency_class=defaults['energy_efficiency_class'],
+            year_of_construction=defaults['year_of_construction'],
+            exchange_apartment=defaults['exchange_apartment']
+        )
+
+    def set_configurations(
             self,
             url_platform: str | None = None,
             zips_included: list[int] | None = None,
@@ -136,51 +186,18 @@ class WohnungssucherBase:
         self.default_year_of_construction = False
         self.default_exchange_apartment = False
 
-    def set_from_cfg(self, config: dict, defaults: dict):
-        self.url_platform=config['url_platform']
-        self.zips_included=config['zips_included']
-        self.zips_excluded=config['zips_excluded']
-        self.places_included=config['places_included']
-        self.places_excluded=config['places_excluded']
-        self.rent_cold_min=config['rent_cold_min']
-        self.rent_cold_max=config['rent_cold_max']
-        self.rent_warm_min=config['rent_warm_min']
-        self.rent_warm_max=config['rent_warm_max']
-        self.rooms_min=config['rooms_min']
-        self.rooms_max=config['rooms_max']
-        self.apartment_size_min=config['apartment_size_min']
-        self.apartment_size_max=config['apartment_size_max']
-        self.floors=config['floors']
-        self.energy_efficiency_classes=config['energy_efficiency_classes']
-        self.year_of_construction_min=config['year_of_construction_min']
-        self.year_of_construction_max=config['year_of_construction_max']
-        self.exchange_apartment=config['exchange_apartment']
-
-        self.set_defaults(
-            zip=defaults['zip'],
-            place=defaults['place'],
-            rent_cold=defaults['rent_cold'],
-            rent_warm=defaults['rent_warm'],
-            room=defaults['room'],
-            apartment_size=defaults['apartment_size'],
-            floor=defaults['floor'],
-            energy_efficiency_class=defaults['energy_efficiency_class'],
-            year_of_construction=defaults['year_of_construction'],
-            exchange_apartment=defaults['exchange_apartment']
-        )
-
     def set_defaults(
             self,
-            zip = False,
-            place = False,
-            rent_cold = False,
-            rent_warm = False,
-            room = False,
-            apartment_size = False,
-            floor = False,
-            energy_efficiency_class = False,
-            year_of_construction = False,
-            exchange_apartment = False,
+            zip: bool = False,
+            place: bool = False,
+            rent_cold: bool = False,
+            rent_warm: bool = False,
+            room: bool = False,
+            apartment_size: bool = False,
+            floor: bool = False,
+            energy_efficiency_class: bool = False,
+            year_of_construction: bool = False,
+            exchange_apartment: bool = False,
     ):
         self.default_zip = zip
         self.default_place = place
@@ -193,19 +210,21 @@ class WohnungssucherBase:
         self.default_year_of_construction = year_of_construction
         self.default_exchange_apartment = exchange_apartment
 
-    @abstractmethod
-    def load_all_apartments(self) -> str:
+    def request_url(self, url) -> HtmlDocument:
         """
-        Does an http get request to the corresponding platform and receives an html with containing all apartments
-        :return: html content containing all apartments
+        Sends an HTTP GET request and convert the response to an HtmlDocument object
+        :param url: url to send an HTTP GET request
+        :return: HTMLDocument object containing the pages content
         """
-        pass
+        response = requests.get(self.url_platform)
+        content = response.text
+        html_document = HtmlDocument(content)
+        return html_document
 
     @abstractmethod
-    def extract_apartments(self, html: str) -> list[Apartment]:
+    def request_all_apartments(self) -> list[Apartment]:
         """
-        Takes an html content containing all apartments and extracts each apartment from it.
-        :param html:
+        Requests all apartments from the platform, extracts them and return them as Apartment object
         :return: list of all apartments
         """
         pass
@@ -251,6 +270,28 @@ class WohnungssucherBase:
             apartments_filtered.append(apartment)
 
         return apartments_filtered
+
+    @staticmethod
+    def parse_url(url_current: str, href: str) -> str:
+        """
+        Parses the url of an href element
+        Absolute URL: https://domain/path/to/content -> no change
+        Relative URL: /path/to/content -> "Domain of url_current"/path/to/content
+                      path/to/content -> url_current/path/to/content
+        :param url_current: the url of the webpage where the html content was requested from
+        :param href: hyperlink reference inside the html content
+        :return:
+        """
+        if re.findall('^[a-z]*://', href):
+            return href
+        elif href.startswith('/'):
+            domain = re.findall('^[a-z]*://[^/]*', url_current)
+            if len(domain) != 1:
+                raise ValueError(f'Invalid url {url_current}')
+            domain = domain[0]
+            return f'{domain}{href}'
+        else:
+            return f'{url_current}{href}'
 
 
 

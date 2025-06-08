@@ -4,6 +4,7 @@ from core.utils import BoolPlus
 
 
 class Apartment:
+    description: str | None
     url: str | None
 
     zip: int | None

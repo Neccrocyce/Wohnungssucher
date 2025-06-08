@@ -1,3 +1,5 @@
+import re
+
 from core.apartment import Apartment
 from core.wohnungssucher_base import WohnungssucherBase
 import requests
@@ -18,18 +20,25 @@ default_year_of_construction: Always
 default_exchange_apartment: No
 """
 
+url = 'https://www.mietwohnungsboerse.de/Immobilien.htm?action_form=search&vermarktungsart=MIETE_PACHT&plz=8%2C9'
+
 class WSMietwohnungsboerse(WohnungssucherBase):
-    url = 'https://www.mietwohnungsboerse.de/Immobilien.htm?action_form=search&vermarktungsart=MIETE_PACHT&plz=8%2C9'
-
     def __init__(self, config, defaults):
-        super().__init__()
-        config['url_platform'] = self.url
-        self.set_from_cfg(config, defaults)
+        config['url_platform'] = url
+        super().__init__(config, defaults)
 
-    def load_all_apartments(self) -> str:
-        response = requests.get(self.url_platform)
-        # todo
-        return response.content
+    def request_all_apartments(self) -> list[Apartment]:
+        html_full = self.request_url(self.url_platform)
+        html_apartments = html_full.get_element_by_id('immo-container-results')
+        if html_apartments is None:
+            raise ValueError('Cannot find id "immo-container-results" in response. Maybe webpage has been modified?')
+
+        for html_apartments_each in html_apartments.children:
+            url_part = html_apartments_each.children[1].children[0].attributes['href']
+            url = self.parse_url(self.url_platform, url_part)
+            html_apartment = self.request_url(url)
+
+        pass
 
     def extract_apartments(self, html: str) -> list[Apartment]:
         """

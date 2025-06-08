@@ -44,7 +44,7 @@ def load_configuration():
 if __name__ == '__main__':
     config, defaults = load_configuration()
     platform = WSMietwohnungsboerse(config, defaults)
-    page = platform.load_all_apartments()
+    page = platform.request_all_apartments()
 
     with open('data.html', 'w') as f:
         f.write(str(page))
