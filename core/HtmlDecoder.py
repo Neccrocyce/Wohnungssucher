@@ -122,6 +122,14 @@ class HtmlElement:
 
         return html_elements_w_inner
 
+    def __str__(self):
+        attr_list = [str(k) + '="' + str(v) + '"' for k, v in self.attributes.items()]
+        attrs = ' '.join(attr_list)
+        return f'<{self.tag} {attrs}>'
+
+    def __repr__(self):
+        return self.__str__()
+
 
 class HtmlDocument:
     # list of all ids in the html document

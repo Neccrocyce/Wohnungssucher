@@ -1,29 +1,150 @@
+from __future__ import annotations
+
+from datetime import datetime, time
 from typing import Any
 
 from core.utils import BoolPlus
 
 
 class Apartment:
-    description: str | None
-    url: str | None
+    # Unique ID of the apartment
+    id: Any
 
+    # Short description of the apartment
+    description: str | None
+
+    # url referencing to the apartment on the corresponding webpage
+    url: str
+
+    # address of the apartment: zip code, place, street and house number
     zip: int | None
     place: str | None
     street: str | None
     house_number: int | None
 
+    # rent without heating (Kaltmiete)
     rent_cold: int | None
+
+    # rent with heating (Warmmiete)
     rent_warm: int | None
+
+    # number of rooms (Anzahl Zimmer)
     rooms: float | None
+
+    # living space of the apartment (Wohnflaeche)
     apartment_size: float | None
 
+    # Floor the apartment is situated (Etage)
     floor: int | None
+
+    # Year of construction (Baujahr)
     year_of_construction: int | None
+
+    # Type of heating, e.g., Gas, oil, ... (Heizungsart)
     heating_type: str | None
+
+    # energy efficiency class of the apartment (Energieeffizienzklasse)
     energy_efficiency_class: str | None
 
+    # Whether it is an exchange apartment (Tauschwohnung)
     exchange_apartment: bool | None
-    released: int | None
+
+    # Timestamp of the day the apartment was first listed on the webpage
+    released: int
+
+    def __init__(
+            self,
+            id: Any,
+            description: str | None,
+            url: str,
+            zip: int | None,
+            place: str | None,
+            street: str | None,
+            house_number: int | None,
+            rent_cold: int | None,
+            rent_warm: int | None,
+            rooms: float | None,
+            apartment_size: float | None,
+            floor: int | None,
+            year_of_construction: int | None,
+            heating_type: str | None,
+            energy_efficiency_class: str | None,
+            exchange_apartment: bool | None,
+            released: int
+    ):
+        self.id = id
+        self.description = description
+        self.url = url
+        self.zip = zip
+        self.place = place
+        self.street = street
+        self.house_number = house_number
+        self.rent_cold = rent_cold
+        self.rent_warm = rent_warm
+        self.rooms = rooms
+        self.apartment_size = apartment_size
+        self.floor = floor
+        self.year_of_construction = year_of_construction
+        self.heating_type = heating_type
+        self.energy_efficiency_class = energy_efficiency_class
+        self.exchange_apartment = exchange_apartment
+        self.released = released
+
+    @classmethod
+    def from_dict(cls, attr: dict) -> Apartment:
+        """
+        Create an object from a dictionary which contains the values for all class attributes.
+        The values for all attributes must be stored in attr even if the value is None.
+        Only the value for the attribute "released" is optional.
+        If the dictionary does not contain the key "released", the timestamp of the current day will set for this
+        attribute.
+        :param attr: dictionary containing the values for all class attributes
+        :return:
+        """
+        if 'released' not in attr.keys():
+            current_day = datetime.now().date()
+            attr['released'] = datetime.combine(current_day, time(0, 0))
+
+        return Apartment(
+            id=attr['id'],
+            description=attr['description'],
+            url=attr['url'],
+            zip=attr['zip'],
+            place=attr['place'],
+            street=attr['street'],
+            house_number=attr['house_number'],
+            rent_cold=attr['rent_cold'],
+            rent_warm=attr['rent_warm'],
+            rooms=attr['rooms'],
+            apartment_size=attr['apartment_size'],
+            floor=attr['floor'],
+            year_of_construction=attr['year_of_construction'],
+            heating_type=attr['heating_type'],
+            energy_efficiency_class=attr['energy_efficiency_class'],
+            exchange_apartment=attr['exchange_apartment'],
+            released=attr['released']
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'description': self.description,
+            'url': self.url,
+            'zip': self.zip,
+            'place': self.place,
+            'street': self.street,
+            'house_number': self.house_number,
+            'rent_cold': self.rent_cold,
+            'rent_warm': self.rent_warm,
+            'rooms': self.rooms,
+            'apartment_size': self.apartment_size,
+            'floor': self.floor,
+            'year_of_construction': self.year_of_construction,
+            'heating_type': self.heating_type,
+            'energy_efficiency_class': self.energy_efficiency_class,
+            'exchange_apartment': self.exchange_apartment,
+            'released': self.released
+        }
 
     def get_address(self):
         return f'{self.street} {self.house_number}\n{self.zip} {self.place}'

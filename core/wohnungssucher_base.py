@@ -216,7 +216,7 @@ class WohnungssucherBase:
         :param url: url to send an HTTP GET request
         :return: HTMLDocument object containing the pages content
         """
-        response = requests.get(self.url_platform)
+        response = requests.get(url)
         content = response.text
         html_document = HtmlDocument(content)
         return html_document
@@ -292,6 +292,25 @@ class WohnungssucherBase:
             return f'{domain}{href}'
         else:
             return f'{url_current}{href}'
+
+    @staticmethod
+    def parse_int_from_euro(number: str) -> int:
+        try:
+            number = re.sub('[€ .]', '', number)
+            number = re.sub('[,]', '.', number)
+            return int(float(number))
+        except:
+            raise TypeError
+
+    @staticmethod
+    def parse_float_from_apt_size(apt_size: str) -> float:
+        pass
+        # TODO
+
+    @staticmethod
+    def raise_error_html_content_not_found(content_type: str, content: str):
+        raise ValueError(f'None or multiple instances of {content_type} "{content}" in response. '
+                         f'Expected exactly one instance. Maybe webpage has been modified?')
 
 
 

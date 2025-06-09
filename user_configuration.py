@@ -51,11 +51,11 @@ rooms_min: int | None = 2
 # e.g., 5
 rooms_max: int | None = None
 
-# The smallest acceptable living space for an apartment, measured in square meters (Minimum Wohnfläche in m^2)
+# The smallest acceptable living space for an apartment, measured in square meters (Minimum Wohnflaeche in m^2)
 # e.g., 50
 apartment_size_min: int | None = 50
 
-# The largest acceptable living space for an apartment, measured in square meters (Maximum Wohnfläche in m^2)
+# The largest acceptable living space for an apartment, measured in square meters (Maximum Wohnflaeche in m^2)
 # e.g., 100
 apartment_size_max: int | None = None
 
