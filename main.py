@@ -22,29 +22,25 @@ def load_configuration():
         'energy_efficiency_classes': user_configuration.energy_efficiency_classes,
         'year_of_construction_min': user_configuration.year_of_construction_min,
         'year_of_construction_max': user_configuration.year_of_construction_max,
-        'exchange_apartment': user_configuration.exchange_apartment
+        'exchange_apartment': user_configuration.exchange_apartment,
+        'path_files': user_configuration.path_files,
+        'max_apartment_age': user_configuration.max_apartment_age
     }
 
     defaults = {
-        'zip': user_configuration.default_zip,
-        'place': user_configuration.default_place,
-        'rent_cold': user_configuration.default_rent_cold,
-        'rent_warm': user_configuration.default_rent_warm,
-        'room': user_configuration.default_room,
-        'apartment_size': user_configuration.default_apartment_size,
-        'floor': user_configuration.default_floor,
-        'energy_efficiency_class': user_configuration.default_energy_efficiency_class,
-        'year_of_construction': user_configuration.default_year_of_construction,
-        'exchange_apartment': user_configuration.default_exchange_apartment,
+        'mietwohnungsboerse': user_configuration.defaults_mietwohnungsboerse
     }
 
     return config, defaults
 
 
 if __name__ == '__main__':
+    platforms = [
+        'mietwohnungsboerse'
+    ]
     config, defaults = load_configuration()
-    platform = WSMietwohnungsboerse(config, defaults)
-    page = platform.request_all_apartments()
 
-    with open('data.html', 'w') as f:
-        f.write(str(page))
+    # mietwohnungsboerse
+    platform = WSMietwohnungsboerse(config, defaults[platforms[0]])
+    platform()
+

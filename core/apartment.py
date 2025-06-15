@@ -103,7 +103,7 @@ class Apartment:
         """
         if 'released' not in attr.keys():
             current_day = datetime.now().date()
-            attr['released'] = datetime.combine(current_day, time(0, 0))
+            attr['released'] = datetime.combine(current_day, time(0, 0)).timestamp()
 
         return Apartment(
             id=attr['id'],
@@ -145,6 +145,9 @@ class Apartment:
             'exchange_apartment': self.exchange_apartment,
             'released': self.released
         }
+
+    def to_html(self) -> str:
+        pass
 
     def get_address(self):
         return f'{self.street} {self.house_number}\n{self.zip} {self.place}'
@@ -295,3 +298,10 @@ class Apartment:
             return default
         else:
             return self.exchange_apartment == allowed_exchange_apartment
+
+    def __str__(self):
+        date = datetime.fromtimestamp(self.released).date()
+        return f'ID {self.id}: {self.description} ({date})'
+
+    def __repr__(self):
+        return self.__str__()
