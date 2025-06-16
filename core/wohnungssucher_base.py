@@ -58,7 +58,8 @@ class WohnungssucherBase:
 
     max_apartment_age: int | None
 
-
+    # all expected in raw apartment dictionary which is returned by request_all_apartments_raw
+    exp_keys_apts_raw: list[str]
 
     def __init__(
             self,
@@ -67,7 +68,8 @@ class WohnungssucherBase:
             defaults_1: dict,
             url_platform: str,
             path_savefile_0: str,
-            path_savefile_1: str
+            path_savefile_1: str,
+            exp_keys_apts_raw: list[str]
     ):
         self.set_configurations(config=config_user)
 
@@ -78,30 +80,35 @@ class WohnungssucherBase:
         self.defaults_0 = defaults_0
         self.defaults_1 = defaults_1
 
+        self.exp_keys_apts_raw = exp_keys_apts_raw
+
         os.makedirs(os.path.dirname(self.path_savefile_0), exist_ok=True)
         os.makedirs(os.path.dirname(self.path_savefile_1), exist_ok=True)
 
 
     def __call__(self, *args, **kwargs):
-        apartments = self.request_all_apartments()
+        apartments = self.request_all_apartments_raw()
+        self._add_missing_keys(apartments)
+        apartments = self.map_apt_keys(apartments)
+        apartments = self._parse_apartments(apartments)
 
-        apts_0 = self.filter_apartments(apartments, self.defaults_0)
-        apts_1 = self.filter_apartments(apartments, self.defaults_1)
-        apts_1 = self.remove_known_apartments(apts_0, apts_1)
+        apts_0 = self._filter_apartments(apartments, self.defaults_0)
+        apts_1 = self._filter_apartments(apartments, self.defaults_1)
+        apts_1 = self._remove_known_apartments(apts_0, apts_1)
 
-        known_apts_0 = self.load_apartments(self.path_savefile_0)
-        known_apts_1 = self.load_apartments(self.path_savefile_1)
+        known_apts_0 = self._load_apartments(self.path_savefile_0)
+        known_apts_1 = self._load_apartments(self.path_savefile_1)
 
-        new_apts_0 = self.remove_known_apartments(known_apts_0 + known_apts_1, apts_0)
-        new_apts_1 = self.remove_known_apartments(known_apts_0 + known_apts_1, apts_1)
+        new_apts_0 = self._remove_known_apartments(known_apts_0 + known_apts_1, apts_0)
+        new_apts_1 = self._remove_known_apartments(known_apts_0 + known_apts_1, apts_1)
 
-        known_apts_keep_0 = self.remove_old_apartments(known_apts_0)
-        known_apts_keep_1 = self.remove_old_apartments(known_apts_1)
+        known_apts_keep_0 = self._remove_old_apartments(known_apts_0)
+        known_apts_keep_1 = self._remove_old_apartments(known_apts_1)
 
-        self.save_apartments(self.path_savefile_0, known_apts_keep_0 + new_apts_0)
-        self.save_apartments(self.path_savefile_1, known_apts_keep_1 + new_apts_1)
+        self._save_apartments(self.path_savefile_0, known_apts_keep_0 + new_apts_0)
+        self._save_apartments(self.path_savefile_1, known_apts_keep_1 + new_apts_1)
 
-        self.send_mail(new_apts_0, new_apts_1)
+        self._send_mail(new_apts_0, new_apts_1)
 
     def set_configurations(self, config: dict):
         self.zips_included = config['zips_included']
@@ -177,14 +184,133 @@ class WohnungssucherBase:
 
 
     @abstractmethod
-    def request_all_apartments(self) -> list[Apartment]:
+    def request_all_apartments_raw(self) -> list[dict]:
         """
-        Requests all apartments from the platform, extracts them and return them as Apartment object
+        Requests all apartments from the platform, extracts them and return them as dictionary.
+        The key-value pairs of the dictionary describe the properties of the apartment.
+        The name of the keys can differ from the attribute names of the apartment class.
+        Also, not all properties must be given.
         :return: list of all apartments
         """
         pass
 
-    def filter_apartments(self, apartments: list[Apartment], defaults: dict) -> list[Apartment]:
+    @abstractmethod
+    def map_apt_keys(self, apts_raw: list[dict]) -> list[dict]:
+        """
+        Maps the values in apts_raw to the keys used in the apartment class.
+        The keys in the resulting dictionaries must be equal to the attributes names of the class apartment.
+        However, the datatypes can be arbitrary.
+        :param apts_raw: list of dictionaries where each dictionary represents one apartment
+        :return: list of dictionaries where each dictionary represents one apartment.
+            The keys in the dictionary must be equal to the attributes names of the class apartment.
+        """
+        pass
+
+    def _add_missing_keys(self, apts_raw: list[dict]):
+        """
+        Checks if each apartment of apts_raw contains all expected keys and add all missing keys with the value None
+        street and house number are ignored since they are never set
+        """
+
+        for apt_raw in apts_raw:
+            missing_keys = []
+
+            for exp_key in self.exp_keys_apts_raw:
+                if exp_key not in apt_raw.keys():
+                    apt_raw[exp_key] = None
+                    missing_keys.append(exp_key)
+
+            if missing_keys:
+                apt_id = apt_raw['id']
+                self.print_info(f'Missing properties for apartment {apt_id}: {missing_keys}. Setting to None.')
+
+    def _parse_apartments(self, apts_dicts: list[dict]) -> list[Apartment]:
+        """
+        Parse the value of all keys in apt_attr_raw to the expected data type.
+        If the value cannot be parsed it will be set to None
+        """
+        apts = []
+        for apt_dict in apts_dicts:
+            try:
+                if apt_dict['zip'] is not None:
+                    apt_dict['zip'] = int(apt_dict['zip'])
+            except (ValueError, TypeError):
+                apt_dict['zip'] = None
+                value = apt_dict['zip']
+                print(f'Error: Cannot parse zip code "{value}"', file=sys.stderr)
+
+            try:
+                if apt_dict['house_number'] is not None:
+                    apt_dict['house_number'] = int(apt_dict['house_number'])
+            except (ValueError, TypeError):
+                apt_dict['house_number'] = None
+                value = apt_dict['house_number']
+                print(f'Error: Cannot parse house_number "{value}"', file=sys.stderr)
+
+            try:
+                if apt_dict['rent_cold'] is not None:
+                    apt_dict['rent_cold'] = self.parse_int_from_euro(apt_dict['rent_cold'])
+            except (ValueError, TypeError):
+                apt_dict['rent_cold'] = None
+                value = apt_dict['rent_cold']
+                print(f'Error: Cannot parse rent_cold "{value}"', file=sys.stderr)
+
+            try:
+                if apt_dict['rent_warm'] is not None:
+                    apt_dict['rent_warm'] = self.parse_int_from_euro(apt_dict['rent_warm'])
+            except (ValueError, TypeError):
+                apt_dict['rent_warm'] = None
+                value = apt_dict['rent_warm']
+                print(f'Error: Cannot parse rent_warm "{value}"', file=sys.stderr)
+
+            try:
+                if apt_dict['rooms'] is not None:
+                    apt_dict['rooms'] = float(apt_dict['rooms'].replace(',', '.'))
+            except (ValueError, TypeError):
+                apt_dict['rooms'] = None
+                value = apt_dict['rooms']
+                print(f'Error: Cannot parse number of rooms "{value}"', file=sys.stderr)
+
+            try:
+                if apt_dict['apartment_size'] is not None:
+                    apt_dict['apartment_size'] = self.parse_float_from_apt_size(apt_dict['apartment_size'])
+            except (ValueError, TypeError):
+                apt_dict['apartment_size'] = None
+                value = apt_dict['apartment_size']
+                print(f'Error: Cannot parse apartment_size "{value}"', file=sys.stderr)
+
+            try:
+                if apt_dict['floor'] is not None:
+                    apt_dict['floor'] = int(apt_dict['floor'])
+            except (ValueError, TypeError):
+                apt_dict['floor'] = None
+                value = apt_dict['floor']
+                print(f'Error: Cannot parse floor "{value}"', file=sys.stderr)
+
+            try:
+                if apt_dict['year_of_construction'] is not None:
+                    apt_dict['year_of_construction'] = int(apt_dict['year_of_construction'])
+            except (ValueError, TypeError):
+                apt_dict['year_of_construction'] = None
+                value = apt_dict['year_of_construction']
+                print(f'Error: Cannot parse year_of_construction "{value}"', file=sys.stderr)
+
+            # TODO parse exchange_apartment
+
+            apts.append(Apartment.from_dict(apt_dict))
+
+        return apts
+
+
+    def _filter_apartments(self, apartments: list[Apartment], defaults: dict) -> list[Apartment]:
+        """
+        Removes all apartment that do not match the defined requirements.
+        If a value is set to None the corresponding default value decides whether the apartment is kept or not
+        (True: keep, False: discard)
+        :param apartments:
+        :param defaults:
+        :return:
+        """
         apartments_filtered = []
 
         for apartment in apartments:
@@ -227,7 +353,7 @@ class WohnungssucherBase:
         return apartments_filtered
 
     @staticmethod
-    def load_apartments(filename: str) -> list[Apartment]:
+    def _load_apartments(filename: str) -> list[Apartment]:
         """
         Loads saved apartments from a json file
         :param filename: path to the json file to be loaded
@@ -246,7 +372,7 @@ class WohnungssucherBase:
         return apartments
 
     @staticmethod
-    def save_apartments(filename: str, apartments: list[Apartment]):
+    def _save_apartments(filename: str, apartments: list[Apartment]):
         """
         Saves all given apartments to a file. The apartments are stored in json format.
         :param filename: path to the json file
@@ -260,7 +386,7 @@ class WohnungssucherBase:
             json.dump(apts_json, f)
 
     @staticmethod
-    def remove_known_apartments(known_apartments: list[Apartment], all_apartments: list[Apartment]) -> list[Apartment]:
+    def _remove_known_apartments(known_apartments: list[Apartment], all_apartments: list[Apartment]) -> list[Apartment]:
         """
         Removes all known apartments from the list of all_apartments to keep only unknown apartments
         :param known_apartments: list of known apartments
@@ -270,7 +396,7 @@ class WohnungssucherBase:
         new_apts = [x for x in all_apartments if x.id not in {y.id for y in known_apartments}]
         return new_apts
 
-    def send_mail(self, apartments_0: list[Apartment], apartments_1: list[Apartment]):
+    def _send_mail(self, apartments_0: list[Apartment], apartments_1: list[Apartment]):
         """
         Sends an email with all given apartments
         :param apartments_0:
@@ -280,7 +406,7 @@ class WohnungssucherBase:
         print(apartments_0)
         print(apartments_1)
 
-    def remove_old_apartments(self, apartments: list[Apartment]) -> list[Apartment]:
+    def _remove_old_apartments(self, apartments: list[Apartment]) -> list[Apartment]:
         """
         Removes all apartments where the release date is older than self.max_apartment_age dqys
         :param apartments: list of apartments to be considered
@@ -338,7 +464,9 @@ class WohnungssucherBase:
             return f'{url_current}{href}'
 
     @staticmethod
-    def parse_int_from_euro(number: str) -> int:
+    def parse_int_from_euro(number: str | int) -> int:
+        if isinstance(number, int):
+            return number
         try:
             number = re.sub('[€ .]', '', number)
             number = re.sub('[,]', '.', number)
@@ -347,7 +475,9 @@ class WohnungssucherBase:
             raise TypeError
 
     @staticmethod
-    def parse_float_from_apt_size(apt_size: str) -> float:
+    def parse_float_from_apt_size(apt_size: str | float) -> float:
+        if isinstance(apt_size, float):
+            return apt_size
         try:
             apt_size_float = re.findall('[\d.,]+', apt_size)[0]
             apt_size_float = float(apt_size_float.replace(',', '.'))
@@ -355,12 +485,24 @@ class WohnungssucherBase:
         except:
             raise TypeError
 
+    def compute_warm_rent_from_additional_costs(self, rent_cold: int | str, additional_costs: int | str):
+        if isinstance(rent_cold, str):
+            rent_cold = self.parse_int_from_euro(rent_cold)
+        if isinstance(additional_costs, str):
+            additional_costs = self.parse_int_from_euro(additional_costs)
+
+        return rent_cold + additional_costs
+
     @staticmethod
     def raise_error_html_content_not_found(content_type: str, content: str):
         raise ValueError(f'None or multiple instances of {content_type} "{content}" in response. '
                          f'Expected exactly one instance. Maybe webpage has been modified?')
 
 
+    def print_info(self, info):
+        print_msg = True
+        if print_msg:
+            print(info)
 
 
 

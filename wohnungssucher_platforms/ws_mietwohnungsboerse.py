@@ -1,7 +1,6 @@
 import os.path
 import re
 
-from core.apartment import Apartment
 from core.wohnungssucher_base import WohnungssucherBase
 
 ##################
@@ -33,6 +32,18 @@ defaults_0 = {
     'exchange_apartment': False
 }
 
+expected_keys_apts_raw = [
+    'Nettokaltmiete',
+    'Warmmiete',
+    'Zimmeranzahl',
+    'Wohnfläche',
+    'Etage',
+    'Baujahr',
+    'Heizungsart',
+    'Energieeffizienzklasse',
+    'Ort'
+]
+
 url = 'https://www.mietwohnungsboerse.de/Immobilien.htm?action_form=search&vermarktungsart=MIETE_PACHT&plz=8%2C9'
 filename_savefile_0 = 'mietwohnungsboerse_0.json'
 filename_savefile_1 = 'mietwohnungsboerse_1.json'
@@ -47,9 +58,17 @@ class WSMietwohnungsboerse(WohnungssucherBase):
     def __init__(self, config, defaults_user):
         path_savefile_0 = os.path.join(config['path_files'], filename_savefile_0)
         path_savefile_1 = os.path.join(config['path_files'], filename_savefile_1)
-        super().__init__(config, defaults_0, defaults_user, url, path_savefile_0, path_savefile_1)
+        super().__init__(
+            config_user=config,
+            defaults_0=defaults_0,
+            defaults_1=defaults_user,
+            url_platform=url,
+            path_savefile_0=path_savefile_0,
+            path_savefile_1=path_savefile_1,
+            exp_keys_apts_raw=expected_keys_apts_raw
+        )
 
-    def request_all_apartments(self) -> list[Apartment]:
+    def request_all_apartments_raw(self) -> list[dict]:
         html_full = self.request_url(self.url_platform)
         if html_full is None:
             raise ValueError('Request to webpage returned status code different than 200')
@@ -57,23 +76,23 @@ class WSMietwohnungsboerse(WohnungssucherBase):
         if html_apts is None:
             self.raise_error_html_content_not_found('id', 'immo-container-results')
 
-        apartments = []
+        apartments_raw = []
         for html_apts_each in html_apts.children:
             # load html of apartment
-            apt_attr_raw = {}
+            apt_raw = {}
             url_part = html_apts_each.children[1].children[0].attributes['href']
             url = self.parse_url(self.url_platform, url_part)
             html_apt = self.request_url(url)
             if html_apt is None:
                 print('Could not load apartment from url. Status code different than 200. Skip apartment')
                 continue
-            apt_attr_raw['url'] = url
+            apt_raw['url'] = url
 
             # extract title
             html_apt_title = html_apt.get_elements_by_class('objektTitel h2')
             if len(html_apt_title) != 1:
                 self.raise_error_html_content_not_found('class', 'objektTitel h2')
-            apt_attr_raw['Description'] = html_apt_title[0].inner_html
+            apt_raw['description'] = html_apt_title[0].inner_html
 
             # extract apartment attributes
             html_apt_attrs = html_apt.get_elements_by_class('objektDatenTabelle')
@@ -82,7 +101,7 @@ class WSMietwohnungsboerse(WohnungssucherBase):
             html_apt_attrs = html_apt_attrs[0]
             html_apt_attrs_gen = html_apt_attrs.children[0].children[0].children[0]
 
-            apt_attr_raw['id'] = html_apt_attrs_gen.children[0].children[0].children[0].inner_html[11:]
+            apt_raw['id'] = html_apt_attrs_gen.children[0].children[0].children[0].inner_html[11:]
 
             for html_apt_attrs_gen_i in html_apt_attrs_gen.children[1:]:
                 for line in html_apt_attrs_gen_i.children:
@@ -91,143 +110,58 @@ class WSMietwohnungsboerse(WohnungssucherBase):
                             continue
                         attr_name = cell.children[0].inner_html
                         attr_value = cell.children[1].inner_html
-                        apt_attr_raw[attr_name] = attr_value
+                        apt_raw[attr_name] = attr_value
 
-            apartment = self.create_apartment(apt_attr_raw)
-            apartments.append(apartment)
+            apartments_raw.append(apt_raw)
 
-        return apartments
+        return apartments_raw
 
-    def add_missing_keys(self, apt_attr_raw: dict):
-        """
-        TODO put in base class
-        Checks if apt_attr_raw contains all expected keys and add all missing keys with the value None
-        street and house number are ignored since they are never set
-        """
-        expected_keys = [
-            'Nettokaltmiete',
-            'Warmmiete',
-            'Zimmeranzahl',
-            'Wohnfläche',
-            'Etage',
-            'Baujahr',
-            'Heizungsart',
-            'Energieeffizienzklasse',
-            'Ort'
-        ]
+    def map_apt_keys(self, apts_raw: list[dict]) -> list[dict]:
+        apts_dicts = []
+        for apt_raw in apts_raw:
+            apt_dict = {
+                'id': apt_raw['id'],
+                'description': apt_raw['description'],
+                'url': apt_raw['url'],
+                'street': None,
+                'house_number': None,
+                'rent_cold': apt_raw['Nettokaltmiete'],
+                'rent_warm': apt_raw['Warmmiete'],
+                'rooms': apt_raw['Zimmeranzahl'],
+                'apartment_size': apt_raw['Wohnfläche'],
+                'floor': apt_raw['Etage'],
+                'year_of_construction': apt_raw['Baujahr'],
+                'heating_type': apt_raw['Heizungsart'],
+                'energy_efficiency_class': apt_raw['Energieeffizienzklasse'],
+                'exchange_apartment': False
+            }
 
-        missing_keys = []
-
-        for exp_key in expected_keys:
-            if exp_key not in apt_attr_raw.keys():
-                apt_attr_raw[exp_key] = None
-                missing_keys.append(exp_key)
-
-        if missing_keys:
-            apt_id = apt_attr_raw['id']
-            self.print_info(
-                f'Missing properties for apartment {apt_id}: {missing_keys}. Setting to None.'
-            )
-
-    def parse_keys(self, apt_attr_raw: dict):
-        """
-        Parse the value of all keys in apt_attr_raw to the expected data type.
-        If the value cannot be parsed it will be set to None
-        """
-        try:
-            if apt_attr_raw['Ort'] is not None:
-                apt_attr_raw['zip'] = int(apt_attr_raw['Ort'][:5])
+            # extract zip code and place
+            if apt_raw['Ort'] is None:
+                apt_dict['zip'] = None
+                apt_dict['place'] = None
             else:
-                apt_attr_raw['zip'] = None
-        except (IndexError, TypeError):
-            apt_attr_raw['zip'] = None
-            value = apt_attr_raw['Ort']
-            print(f'Warning: Cannot parse zip code "{value}"')
+                try:
+                    apt_dict['zip'] = apt_raw['Ort'][:5]
+                except IndexError:
+                    apt_dict['zip'] = None
+                    value = apt_raw['Ort']
+                    print(f'Warning: Cannot obtain zip code from "{value}"')
 
-        try:
-            if apt_attr_raw['Ort'] is not None:
-                place = apt_attr_raw['Ort'][6:]
-                apt_attr_raw['place'] = re.findall('[^ ]*', place)[0]
-            else:
-                apt_attr_raw['place'] = None
-        except (IndexError, TypeError):
-            apt_attr_raw['place'] = None
-            value = apt_attr_raw['Ort']
-            print(f'Warning: Cannot parse place "{value}"')
+                try:
+                    place = apt_raw['Ort'][6:]
+                    apt_dict['place'] = re.findall('[^ ]*', place)[0]
+                except IndexError:
+                    apt_dict['place'] = None
+                    value = apt_raw['Ort']
+                    print(f'Warning: Cannot obtain place from "{value}"')
 
-        try:
-            if apt_attr_raw['Nettokaltmiete'] is not None:
-                apt_attr_raw['Nettokaltmiete'] = self.parse_int_from_euro(apt_attr_raw['Nettokaltmiete'])
-        except (ValueError, TypeError):
-            apt_attr_raw['Nettokaltmiete'] = None
-            value = apt_attr_raw['Nettokaltmiete']
-            print(f'Warning: Cannot parse Nettokaltmiete "{value}"')
+            # compute warm rent if property "Nebenkosten" instead of "Warmmiete"
+            if apt_raw['Warmmiete'] is None and 'Nebenkosten' in apt_raw.keys():
+                apt_dict['rent_warm'] = self.compute_warm_rent_from_additional_costs(
+                    apt_raw['Nettokaltmiete'], apt_raw['Nebenkosten']
+                )
 
-        try: # TODO Nebenkosten
-            if apt_attr_raw['Warmmiete'] is not None:
-                apt_attr_raw['Warmmiete'] = self.parse_int_from_euro(apt_attr_raw['Warmmiete'])
-        except (ValueError, TypeError):
-            apt_attr_raw['Warmmiete'] = None
-            value = apt_attr_raw['Warmmiete']
-            print(f'Warning: Cannot parse Warmmiete "{value}"')
+            apts_dicts.append(apt_dict)
 
-        try:
-            if apt_attr_raw['Zimmeranzahl'] is not None:
-                apt_attr_raw['Zimmeranzahl'] = float(apt_attr_raw['Zimmeranzahl'].replace(',', '.'))
-        except (ValueError, TypeError):
-            apt_attr_raw['Zimmeranzahl'] = None
-            value = apt_attr_raw['Zimmeranzahl']
-            print(f'Warning: Cannot parse Zimmeranzahl "{value}"')
-
-        try:
-            if apt_attr_raw['Wohnfläche'] is not None:
-                apt_attr_raw['Wohnfläche'] = self.parse_float_from_apt_size(apt_attr_raw['Wohnfläche'])
-        except (ValueError, TypeError):
-            apt_attr_raw['Wohnfläche'] = None
-            value = apt_attr_raw['Wohnfläche']
-            print(f'Warning: Cannot parse Wohnfläche "{value}"')
-
-        try:
-            if apt_attr_raw['Etage'] is not None:
-                apt_attr_raw['Etage'] = int(apt_attr_raw['Etage'])
-        except (ValueError, TypeError):
-            apt_attr_raw['Etage'] = None
-            value = apt_attr_raw['Etage']
-            print(f'Warning: Cannot parse Etage "{value}"')
-
-        try:
-            if apt_attr_raw['Baujahr'] is not None:
-                apt_attr_raw['Baujahr'] = int(apt_attr_raw['Baujahr'])
-        except (ValueError, TypeError):
-            apt_attr_raw['Baujahr'] = None
-            value = apt_attr_raw['Baujahr']
-            print(f'Warning: Cannot parse Baujahr "{value}"')
-
-    def create_apartment(self, apt_attr_raw: dict) -> Apartment:
-        self.add_missing_keys(apt_attr_raw)
-        self.parse_keys(apt_attr_raw)
-
-        apt_dict = {
-            'id': apt_attr_raw['id'],
-            'description': apt_attr_raw['Description'],
-            'url': apt_attr_raw['url'],
-            'zip': apt_attr_raw['zip'],
-            'place': apt_attr_raw['place'],
-            'street': None,
-            'house_number': None,
-            'rent_cold': apt_attr_raw['Nettokaltmiete'],
-            'rent_warm': apt_attr_raw['Warmmiete'],
-            'rooms': apt_attr_raw['Zimmeranzahl'],
-            'apartment_size': apt_attr_raw['Wohnfläche'],
-            'floor': apt_attr_raw['Etage'],
-            'year_of_construction': apt_attr_raw['Baujahr'],
-            'heating_type': apt_attr_raw['Heizungsart'],
-            'energy_efficiency_class': apt_attr_raw['Energieeffizienzklasse'],
-            'exchange_apartment': False
-        }
-
-        return Apartment.from_dict(apt_dict)
-
-    def print_info(self, info):
-        if self.print_msg:
-            print(info)
+        return apts_dicts
