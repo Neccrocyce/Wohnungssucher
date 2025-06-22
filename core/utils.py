@@ -1,5 +1,64 @@
 from __future__ import annotations
+
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import Literal
+
+import user_configuration
+
+
+def load_configuration():
+    config = {
+        'zips_included': user_configuration.zips_included,
+        'zips_excluded': user_configuration.zips_excluded,
+        'places_included': user_configuration.places_included,
+        'places_excluded': user_configuration.places_excluded,
+        'rent_cold_min': user_configuration.rent_cold_min,
+        'rent_cold_max': user_configuration.rent_cold_max,
+        'rent_warm_min': user_configuration.rent_warm_min,
+        'rent_warm_max': user_configuration.rent_warm_max,
+        'rooms_min': user_configuration.rooms_min,
+        'rooms_max': user_configuration.rooms_max,
+        'apartment_size_min': user_configuration.apartment_size_min,
+        'apartment_size_max': user_configuration.apartment_size_max,
+        'floors': user_configuration.floors,
+        'energy_efficiency_classes': user_configuration.energy_efficiency_classes,
+        'year_of_construction_min': user_configuration.year_of_construction_min,
+        'year_of_construction_max': user_configuration.year_of_construction_max,
+        'exchange_apartment': user_configuration.exchange_apartment,
+        'path_files': user_configuration.path_files,
+        'max_apartment_age': user_configuration.max_apartment_age,
+        'email_from_address': user_configuration.email_from_address,
+        'email_to_address': user_configuration.email_to_address,
+        'email_send_status': user_configuration.email_send_status
+    }
+
+    defaults = {
+        'mietwohnungsboerse': user_configuration.defaults_mietwohnungsboerse
+    }
+
+    return config, defaults
+
+
+def send_mail(from_addr: str, to_addr: str, subject: str, msg_plain: str = '', msg_html: str = ''):
+    msg = MIMEMultipart()
+    msg['Subject'] = subject
+    msg['From'] = from_addr
+    msg['To'] = to_addr
+
+    if msg_plain:
+        msg.attach(MIMEText(msg_plain, 'plain'))
+    if msg_html:
+        msg.attach(MIMEText(msg_html, 'html'))
+
+    with smtplib.SMTP('localhost') as server:
+        server.sendmail(from_addr=from_addr, to_addrs=to_addr, msg=msg.as_string())
+
+def send_error_mail(from_addr, to_addr, msg):
+    subject = 'Critical error occurred during the execution of Wohnungssucher'
+    if user_configuration.email_send_status:
+        send_mail(from_addr, to_addr, subject, msg_plain=msg)
 
 
 class BoolPlus:
@@ -127,8 +186,3 @@ class BoolPlus:
 
     def __repr__(self):
         return self.__str__()
-
-
-a = BoolPlus.true()
-b = BoolPlus.maybe()
-print(a == b)

@@ -146,8 +146,75 @@ class Apartment:
             'released': self.released
         }
 
-    def to_html(self) -> str:
-        pass
+    def to_html(self) -> tuple[str, str]:
+        description = self.description if self.description is not None else 'Wohnung'
+        zip = str(self.zip) if self.zip is not None else 'k.A.'
+        place = self.place if self.place is not None else ''
+        street = self.street if self.street is not None else ''
+        house_number = str(self.house_number) if self.house_number is not None else ''
+        rent_cold = f'{self.rent_cold} €' if self.rent_cold is not None else 'k.A.'
+        rent_warm = f'{self.rent_warm} €' if self.rent_warm is not None else 'k.A.'
+        rooms = f'{self.rooms} Zimmer' if self.rooms is not None else 'k.A.'
+        apartment_size = f'{self.apartment_size} m²' if self.apartment_size is not None else 'k.A.'
+        if self.floor is None:
+            floor = 'k.A.'
+        elif self.floor == 0:
+            floor = 'Erdgeschoss'
+        else:
+            floor = f'{self.floor}. Obergeschoss'
+        year_of_construction = str(self.year_of_construction) if self.year_of_construction is not None else 'k.A.'
+        apt_id = str(self.id)
+
+        html_head = self.get_html_header()
+
+        html_block = ('\t<div class="block">\n\t\t<div class="inner_block_title">\n'
+                      f'\t\t\t<a href="{self.url}" style="text-decoration: none;">\n'
+                      f'\t\t\t\t<h2>{description}</h2>\n\t\t\t</a>\n'
+                      '\t\t</div>\n\t\t<div class="inner_block_text">\n'
+                      '\t\t\t<table>\n\t\t\t\t<tr>\n'
+                      '\t\t\t\t\t<th class="col_odd"></th>\n'
+                      '\t\t\t\t\t<th class="col_even"></th>\n'
+                      '\t\t\t\t\t<th class="col_odd"></th>\n'
+                      '\t\t\t\t\t<th class="col_even"></th>\n\t\t\t\t</tr>\n'
+                      '\t\t\t\t<tr>\n\t\t\t\t\t<td>\n\t\t\t\t\t\t&#x1F6CF;&#xFE0E;\n\t\t\t\t\t</td>\n'
+                      f'\t\t\t\t\t<td>\n\t\t\t\t\t\t{rooms}\n\t\t\t\t\t</td>\n'
+                      '\t\t\t\t\t<td>\n\t\t\t\t\t\t&#x1F4CD;&#xFE0E;\n\t\t\t\t\t</td>\n'
+                      f'\t\t\t\t\t<td>\n\t\t\t\t\t\t{street} {house_number}<br>{zip} {place}\n\t\t\t\t\t</td>\n\t\t\t\t</tr>\n'
+                      '\t\t\t\t<tr>\n\t\t\t\t\t<td>\n\t\t\t\t\t\t&#x1F4D0;&#xFE0E;\n\t\t\t\t\t</td>\n'
+                      f'\t\t\t\t\t<td>\n\t\t\t\t\t\t{apartment_size}\n\t\t\t\t\t</td>\n'
+                      '\t\t\t\t\t<td>\n\t\t\t\t\t\t&#x1F3E2;&#xFE0E;\n\t\t\t\t\t</td>\n'
+                      f'\t\t\t\t\t<td>\n\t\t\t\t\t\t{floor}\n\t\t\t\t\t</td>\n\t\t\t\t</tr>\n'
+                      '\t\t\t\t<tr>\n\t\t\t\t\t<td>\n\t\t\t\t\t\t&#10052;&#xFE0E;&nbsp;\n\t\t\t\t\t</td>\n'
+                      f'\t\t\t\t\t<td>\n\t\t\t\t\t\t{rent_cold}\n\t\t\t\t\t</td>\n'
+                      '\t\t\t\t\t<td>\n\t\t\t\t\t\t&#127777;&#xFE0E;\n\t\t\t\t\t</td>\n'
+                      f'\t\t\t\t\t<td>\n\t\t\t\t\t\t{rent_warm}\n\t\t\t\t\t</td>\n\t\t\t\t</tr>\n'
+                      '\t\t\t\t<tr></tr>\n'
+                      '\t\t\t\t<tr>\n\t\t\t\t\t<td>\n\t\t\t\t\t\t&#x1F3D7;&#xFE0E;\n\t\t\t\t\t</td>\n'
+                      f'\t\t\t\t\t<td>\n\t\t\t\t\t\t{year_of_construction}\n\t\t\t\t\t</td>\n'
+                      '\t\t\t\t\t<td>\n\t\t\t\t\t\t&#x1F194;&#xFE0E;\n\t\t\t\t\t</td>\n'
+                      f'\t\t\t\t\t<td>\n\t\t\t\t\t\t{apt_id}\n\t\t\t\t\t</td>\n'
+                      '\t\t\t\t</tr>\n\n\t\t\t</table>\n\t\t</div>\n\t</div>')
+
+        return html_head, html_block
+
+    @staticmethod
+    def get_html_header():
+        html_head = ('<head>\n\t<meta charset="UTF-8">\n\t<style>'
+                     '\n\t\th1 {\n\t\t\twidth: 80%;\n\t\t\tmargin: auto;\n\t\t\tmargin-top: 30px;\n'
+                     '\t\t\tpadding: 5px;\n\t\t\tfont-family: Arial, sans-serif;\n\t\t\tmax-width: 750px;\n\t\t}'
+                     '\n\t\t.block {\n\t\t\tborder: 1px solid #ccc;\n'
+                     '\t\t\tborder-radius: 2px;\n\t\t\tbox-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);\n'
+                     '\t\t\t/* cursor: pointer; */\n\t\t\twidth: 80%;\n\t\t\tmargin: auto;\n\t\t\tmargin-top: 15px;\n'
+                     '\t\t\tpadding: 5px;\n\t\t\tfont-family: Arial, sans-serif;\n\t\t\tmax-width: 750px;\n\t\t}\n'
+                     '\t\t.block:hover {\n\t\t\tbox-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);\n\t\t}\n'
+                     '\t\t.inner_block_title {\n\t\t\tbackground-color: #1A1A2E;\n\t\t\tpadding: 10px;\n'
+                     '\t\t}\n\t\t.inner_block_title h2 {\n\t\t\tcolor: white;\n\t\t\ttext-align: center;\n'
+                     '\t\t\tmargin: 10px\n\t\t}\n\t\t.inner_block_text {\n\t\t\tcolor: black;\n'
+                     '\t\t\tbackground-color: #F5F5F5;\n\t\t\tpadding: 10px;\n\t\t\tpadding-top: 0px;\n'
+                     '\t\t}\n\t\t.inner_block_text table {\n\t\t\twidth: 100%;\n\t\t\tborder-spacing: 10px;\n'
+                     '\t\t\ttable-layout: fixed;\n\t\t}\n\t\t.col_odd {\n\t\t\twidth: 3%;\n\t\t}\n\t\t.col_even {\n'
+                     '\t\t\twidth: 45%;\n\t\t}\n\n\t</style>\n</head>')
+        return html_head
 
     def get_address(self):
         return f'{self.street} {self.house_number}\n{self.zip} {self.place}'

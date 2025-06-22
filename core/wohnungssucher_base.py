@@ -7,12 +7,15 @@ from datetime import datetime, time
 
 import requests
 
+import utils
 from core.HtmlDecoder import HtmlDocument
 from core.apartment import Apartment
 from core.utils import BoolPlus
 
 
 class WohnungssucherBase:
+    platform_name: str
+
     url_platform: str | None
 
     # Path to the savefile storing all apartments with provide information for all properties defined in default_0.
@@ -22,6 +25,9 @@ class WohnungssucherBase:
     # Path to the savefile storing all apartments with provide information for all properties defined in default_1.
     # These are usually all properties defined by the user to be important.
     path_savefile_1: str
+
+    # Path to the logfile storing errors that occurred during a run.
+    path_logfile: str
 
     # Defines which properties must be provided for an apartment to be considered in group 0.
     # Group 0 usually contains all apartments for that all properties are provided by the platform.
@@ -58,24 +64,34 @@ class WohnungssucherBase:
 
     max_apartment_age: int | None
 
-    # all expected in raw apartment dictionary which is returned by request_all_apartments_raw
+    email_from_addr: str
+    email_to_addr: str | None
+
+    # all expected keys in raw apartment dictionary which is returned by request_all_apartments_raw
     exp_keys_apts_raw: list[str]
+
+    # list all occurred errors which are not critical
+    occurred_errors: list[dict]
 
     def __init__(
             self,
             config_user: dict,
             defaults_0: dict,
             defaults_1: dict,
+            platform_name: str,
             url_platform: str,
             path_savefile_0: str,
             path_savefile_1: str,
+            path_logfile: str,
             exp_keys_apts_raw: list[str]
     ):
         self.set_configurations(config=config_user)
 
+        self.platform_name = platform_name
         self.url_platform = url_platform
         self.path_savefile_0 = path_savefile_0
         self.path_savefile_1 = path_savefile_1
+        self.path_logfile = path_logfile
 
         self.defaults_0 = defaults_0
         self.defaults_1 = defaults_1
@@ -84,6 +100,9 @@ class WohnungssucherBase:
 
         os.makedirs(os.path.dirname(self.path_savefile_0), exist_ok=True)
         os.makedirs(os.path.dirname(self.path_savefile_1), exist_ok=True)
+        os.makedirs(os.path.dirname(self.path_logfile), exist_ok=True)
+
+        self.occurred_errors = []
 
 
     def __call__(self, *args, **kwargs):
@@ -96,8 +115,8 @@ class WohnungssucherBase:
         apts_1 = self._filter_apartments(apartments, self.defaults_1)
         apts_1 = self._remove_known_apartments(apts_0, apts_1)
 
-        known_apts_0 = self._load_apartments(self.path_savefile_0)
-        known_apts_1 = self._load_apartments(self.path_savefile_1)
+        known_apts_0 = self.load_apartments(self.path_savefile_0)
+        known_apts_1 = self.load_apartments(self.path_savefile_1)
 
         new_apts_0 = self._remove_known_apartments(known_apts_0 + known_apts_1, apts_0)
         new_apts_1 = self._remove_known_apartments(known_apts_0 + known_apts_1, apts_1)
@@ -105,10 +124,15 @@ class WohnungssucherBase:
         known_apts_keep_0 = self._remove_old_apartments(known_apts_0)
         known_apts_keep_1 = self._remove_old_apartments(known_apts_1)
 
-        self._save_apartments(self.path_savefile_0, known_apts_keep_0 + new_apts_0)
-        self._save_apartments(self.path_savefile_1, known_apts_keep_1 + new_apts_1)
+        self.save_apartments(self.path_savefile_0, known_apts_keep_0 + new_apts_0)
+        self.save_apartments(self.path_savefile_1, known_apts_keep_1 + new_apts_1)
 
         self._send_mail(new_apts_0, new_apts_1)
+        self.save_errors()
+
+        print('\n' + self.platform_name)
+        print(f'New apartments: {new_apts_0}')
+        print(f'Further apartments: {new_apts_1}')
 
     def set_configurations(self, config: dict):
         self.zips_included = config['zips_included']
@@ -182,6 +206,9 @@ class WohnungssucherBase:
         else:
             self.exchange_apartment = config['exchange_apartment']
 
+        self.email_from_addr = config['email_from_address']
+        self.email_to_addr = config['email_to_address']
+
 
     @abstractmethod
     def request_all_apartments_raw(self) -> list[dict]:
@@ -222,7 +249,7 @@ class WohnungssucherBase:
 
             if missing_keys:
                 apt_id = apt_raw['id']
-                self.print_info(f'Missing properties for apartment {apt_id}: {missing_keys}. Setting to None.')
+                print(f'Missing properties for apartment {apt_id}: {missing_keys}. Setting to None.')
 
     def _parse_apartments(self, apts_dicts: list[dict]) -> list[Apartment]:
         """
@@ -237,7 +264,7 @@ class WohnungssucherBase:
             except (ValueError, TypeError):
                 apt_dict['zip'] = None
                 value = apt_dict['zip']
-                print(f'Error: Cannot parse zip code "{value}"', file=sys.stderr)
+                self.log_error(f'Error: Cannot parse zip code "{value}"')
 
             try:
                 if apt_dict['house_number'] is not None:
@@ -245,7 +272,7 @@ class WohnungssucherBase:
             except (ValueError, TypeError):
                 apt_dict['house_number'] = None
                 value = apt_dict['house_number']
-                print(f'Error: Cannot parse house_number "{value}"', file=sys.stderr)
+                self.log_error(f'Error: Cannot parse house_number "{value}"')
 
             try:
                 if apt_dict['rent_cold'] is not None:
@@ -253,7 +280,7 @@ class WohnungssucherBase:
             except (ValueError, TypeError):
                 apt_dict['rent_cold'] = None
                 value = apt_dict['rent_cold']
-                print(f'Error: Cannot parse rent_cold "{value}"', file=sys.stderr)
+                self.log_error(f'Error: Cannot parse rent_cold "{value}"')
 
             try:
                 if apt_dict['rent_warm'] is not None:
@@ -261,7 +288,7 @@ class WohnungssucherBase:
             except (ValueError, TypeError):
                 apt_dict['rent_warm'] = None
                 value = apt_dict['rent_warm']
-                print(f'Error: Cannot parse rent_warm "{value}"', file=sys.stderr)
+                self.log_error(f'Error: Cannot parse rent_warm "{value}"')
 
             try:
                 if apt_dict['rooms'] is not None:
@@ -269,7 +296,7 @@ class WohnungssucherBase:
             except (ValueError, TypeError):
                 apt_dict['rooms'] = None
                 value = apt_dict['rooms']
-                print(f'Error: Cannot parse number of rooms "{value}"', file=sys.stderr)
+                self.log_error(f'Error: Cannot parse number of rooms "{value}"')
 
             try:
                 if apt_dict['apartment_size'] is not None:
@@ -277,7 +304,7 @@ class WohnungssucherBase:
             except (ValueError, TypeError):
                 apt_dict['apartment_size'] = None
                 value = apt_dict['apartment_size']
-                print(f'Error: Cannot parse apartment_size "{value}"', file=sys.stderr)
+                self.log_error(f'Error: Cannot parse apartment_size "{value}"')
 
             try:
                 if apt_dict['floor'] is not None:
@@ -285,7 +312,7 @@ class WohnungssucherBase:
             except (ValueError, TypeError):
                 apt_dict['floor'] = None
                 value = apt_dict['floor']
-                print(f'Error: Cannot parse floor "{value}"', file=sys.stderr)
+                self.log_error(f'Error: Cannot parse floor "{value}"')
 
             try:
                 if apt_dict['year_of_construction'] is not None:
@@ -293,7 +320,7 @@ class WohnungssucherBase:
             except (ValueError, TypeError):
                 apt_dict['year_of_construction'] = None
                 value = apt_dict['year_of_construction']
-                print(f'Error: Cannot parse year_of_construction "{value}"', file=sys.stderr)
+                self.log_error(f'Error: Cannot parse year_of_construction "{value}"')
 
             # TODO parse exchange_apartment
 
@@ -353,7 +380,7 @@ class WohnungssucherBase:
         return apartments_filtered
 
     @staticmethod
-    def _load_apartments(filename: str) -> list[Apartment]:
+    def load_apartments(filename: str) -> list[Apartment]:
         """
         Loads saved apartments from a json file
         :param filename: path to the json file to be loaded
@@ -372,7 +399,7 @@ class WohnungssucherBase:
         return apartments
 
     @staticmethod
-    def _save_apartments(filename: str, apartments: list[Apartment]):
+    def save_apartments(filename: str, apartments: list[Apartment]):
         """
         Saves all given apartments to a file. The apartments are stored in json format.
         :param filename: path to the json file
@@ -403,8 +430,50 @@ class WohnungssucherBase:
         :param apartments_1:
         :return:
         """
-        print(apartments_0)
-        print(apartments_1)
+        if self.email_to_addr is None:
+            return
+
+        if len(apartments_0) == 0:
+            headline_0 = ''
+        elif len(apartments_0) == 1:
+            headline_0 = '1 neues Angebot'
+        else:
+            headline_0 = f'{len(apartments_0)} neue Angebote'
+        email_content = '<!DOCTYPE html>\n<html lang="en">\n'
+        email_content += Apartment.get_html_header()
+        email_content += f'\n<body>\n\t<div>\n\t\t<h1>{headline_0}</h1>\n\t</div>\n'
+        for apt_0 in apartments_0:
+            email_content += apt_0.to_html()[1]
+
+        if apartments_1:
+            email_content += '\n\t<div>\n\t\t<h1>Weitere Angebote</h1>\n\t</div>\n'
+            for apt_1 in apartments_1:
+                email_content += apt_1.to_html()[1]
+        email_content += '</body>\n</html>'
+
+        subject = f'Neue Wohnungen bei {self.platform_name}'
+
+        utils.send_mail(self.email_from_addr, self.email_to_addr, subject, msg_html=email_content)
+
+    def load_errors(self) -> list[dict]:
+        """
+        Loads saved errors from a json file
+        :return: list of errors
+        """
+        if not os.path.exists(self.path_logfile):
+            return []
+
+        with open(self.path_logfile, 'r') as file:
+            errors = json.load(file)
+
+        return errors
+
+    def save_errors(self):
+        errors_all = self.load_errors()
+        errors_all += self.occurred_errors
+
+        with open(self.path_logfile, 'w') as f:
+            json.dump(errors_all, f)
 
     def _remove_old_apartments(self, apartments: list[Apartment]) -> list[Apartment]:
         """
@@ -441,8 +510,7 @@ class WohnungssucherBase:
         html_document = HtmlDocument(content)
         return html_document
 
-    @staticmethod
-    def parse_url(url_current: str, href: str) -> str:
+    def parse_url(self, url_current: str, href: str) -> str | None:
         """
         Parses the url of an href element
         Absolute URL: https://domain/path/to/content -> no change
@@ -450,14 +518,15 @@ class WohnungssucherBase:
                       path/to/content -> url_current/path/to/content
         :param url_current: the url of the webpage where the html content was requested from
         :param href: hyperlink reference inside the html content
-        :return:
+        :return: the complete url or None if url_current is invalid
         """
         if re.findall('^[a-z]*://', href):
             return href
         elif href.startswith('/'):
             domain = re.findall('^[a-z]*://[^/]*', url_current)
             if len(domain) != 1:
-                raise ValueError(f'Invalid url {url_current}')
+                self.log_error(f'Invalid url format "{url_current}"')
+                return None
             domain = domain[0]
             return f'{domain}{href}'
         else:
@@ -493,16 +562,24 @@ class WohnungssucherBase:
 
         return rent_cold + additional_costs
 
-    @staticmethod
-    def raise_error_html_content_not_found(content_type: str, content: str):
-        raise ValueError(f'None or multiple instances of {content_type} "{content}" in response. '
-                         f'Expected exactly one instance. Maybe webpage has been modified?')
+    def log_error(self, msg: str, critical: bool = False):
+        self.occurred_errors.append({
+            'timestamp': datetime.now().timestamp(),
+            'type': 'CRITICAL' if critical else 'ERROR',
+            'msg': msg
+        })
+
+        print(msg, file=sys.stderr)
 
 
-    def print_info(self, info):
-        print_msg = True
-        if print_msg:
-            print(info)
+    def log_error_html_content_not_found(self, content_type: str, content: str, critical: bool = False):
+        err_msg = (f'None or multiple instances of {content_type} "{content}" in response. '
+                   f'Expected exactly one instance. Maybe webpage has been modified?')
+        if critical:
+            raise ValueError(err_msg)
+        else:
+            err_msg += ' Skipped apartment!'
+            self.log_error(err_msg)
 
 
 

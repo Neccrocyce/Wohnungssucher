@@ -33,7 +33,7 @@ rent_cold_min: int | None = 500
 
 # Highest acceptable rental price for an apartment excluding heating (Maximum Kaltmiete)
 # e.g., 3000
-rent_cold_max: int | None = 2000
+rent_cold_max: int | None = 1300
 
 # Lowest acceptable rental price for an apartment including heating (Minimum Warmmiete)
 # e.g., 500
@@ -53,7 +53,7 @@ rooms_max: int | None = None
 
 # The smallest acceptable living space for an apartment, measured in square meters (Minimum Wohnflaeche in m^2)
 # e.g., 50
-apartment_size_min: int | None = 40
+apartment_size_min: int | None = 55
 
 # The largest acceptable living space for an apartment, measured in square meters (Maximum Wohnflaeche in m^2)
 # e.g., 100
@@ -132,3 +132,14 @@ path_files: str = 'data'
 # After removal if the apartment is still on the webpage it will be considered as new apartment on the next run.
 # Set to None to ignore
 max_apartment_age: int | None = None
+
+# The sender's email address used to send notifications about new apartment listings.
+email_from_address: str = ''
+
+# Designated recipient email address for alerts regarding newly listed apartments.
+# Set to None to not send emails.
+email_to_address: str | None = None
+
+# Whether to send weekly reports summarizing application status and any encountered errors.
+# Critical errors trigger immediate email notifications.
+email_send_status: bool = False

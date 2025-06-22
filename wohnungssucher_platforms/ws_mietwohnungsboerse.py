@@ -44,37 +44,41 @@ expected_keys_apts_raw = [
     'Ort'
 ]
 
+apartment_portal_name = 'Mietwohnungsboerse'
 url = 'https://www.mietwohnungsboerse.de/Immobilien.htm?action_form=search&vermarktungsart=MIETE_PACHT&plz=8%2C9'
 filename_savefile_0 = 'mietwohnungsboerse_0.json'
 filename_savefile_1 = 'mietwohnungsboerse_1.json'
+filename_logfile = 'mietwohnungsboerse_errors.json'
 
 ####################
 # CLASS DEFINITION #
 ####################
 
 class WSMietwohnungsboerse(WohnungssucherBase):
-    print_msg = True
 
     def __init__(self, config, defaults_user):
         path_savefile_0 = os.path.join(config['path_files'], filename_savefile_0)
         path_savefile_1 = os.path.join(config['path_files'], filename_savefile_1)
+        path_logfile = os.path.join(config['path_files'], filename_logfile)
         super().__init__(
             config_user=config,
             defaults_0=defaults_0,
             defaults_1=defaults_user,
+            platform_name=apartment_portal_name,
             url_platform=url,
             path_savefile_0=path_savefile_0,
             path_savefile_1=path_savefile_1,
+            path_logfile=path_logfile,
             exp_keys_apts_raw=expected_keys_apts_raw
         )
 
     def request_all_apartments_raw(self) -> list[dict]:
         html_full = self.request_url(self.url_platform)
         if html_full is None:
-            raise ValueError('Request to webpage returned status code different than 200')
+            raise ValueError(f'Request to webpage with url "{self.url_platform}" returned status code different than 200')
         html_apts = html_full.get_element_by_id('immo-container-results')
         if html_apts is None:
-            self.raise_error_html_content_not_found('id', 'immo-container-results')
+            self.log_error_html_content_not_found('id', 'immo-container-results', critical=True)
 
         apartments_raw = []
         for html_apts_each in html_apts.children:
@@ -82,22 +86,25 @@ class WSMietwohnungsboerse(WohnungssucherBase):
             apt_raw = {}
             url_part = html_apts_each.children[1].children[0].attributes['href']
             url = self.parse_url(self.url_platform, url_part)
+            if url is None:
+                self.log_error('fCould not load apartment from url "{url}". Invalid url format. Skipping apartment.')
             html_apt = self.request_url(url)
             if html_apt is None:
-                print('Could not load apartment from url. Status code different than 200. Skip apartment')
+                self.log_error(f'Could not load apartment from url "{url}". '
+                               f'Status code different than 200. Skipping apartment')
                 continue
             apt_raw['url'] = url
 
             # extract title
             html_apt_title = html_apt.get_elements_by_class('objektTitel h2')
             if len(html_apt_title) != 1:
-                self.raise_error_html_content_not_found('class', 'objektTitel h2')
+                self.log_error_html_content_not_found('class', 'objektTitel h2')
             apt_raw['description'] = html_apt_title[0].inner_html
 
             # extract apartment attributes
             html_apt_attrs = html_apt.get_elements_by_class('objektDatenTabelle')
             if len(html_apt_attrs) != 1:
-                self.raise_error_html_content_not_found('class', 'objektDatenTabelle')
+                self.log_error_html_content_not_found('class', 'objektDatenTabelle')
             html_apt_attrs = html_apt_attrs[0]
             html_apt_attrs_gen = html_apt_attrs.children[0].children[0].children[0]
 
@@ -115,6 +122,9 @@ class WSMietwohnungsboerse(WohnungssucherBase):
             apartments_raw.append(apt_raw)
 
         return apartments_raw
+
+    # def request_apartment(self, url: str) -> dict:
+    #     pass
 
     def map_apt_keys(self, apts_raw: list[dict]) -> list[dict]:
         apts_dicts = []
