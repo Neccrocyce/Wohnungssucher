@@ -5,6 +5,9 @@ import sys
 # tag names of empty html elements (without end tag)
 html_empty_elements = [
     '!DOCTYPE',
+    '!doctype',
+    '!Doctype',
+    '!DocType',
     'area',
     'base',
     'br',

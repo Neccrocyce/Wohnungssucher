@@ -19,7 +19,7 @@ default_year_of_construction: Always
 default_exchange_apartment: No
 """
 
-defaults_0 = {
+defaults_ws = {
     'zip': False,
     'place': False,
     'rent_cold': False,
@@ -56,14 +56,13 @@ filename_logfile = 'mietwohnungsboerse_errors.json'
 
 class WSMietwohnungsboerse(WohnungssucherBase):
 
-    def __init__(self, config, defaults_user):
+    def __init__(self, config):
         path_savefile_0 = os.path.join(config['path_files'], filename_savefile_0)
         path_savefile_1 = os.path.join(config['path_files'], filename_savefile_1)
         path_logfile = os.path.join(config['path_files'], filename_logfile)
         super().__init__(
             config_user=config,
-            defaults_0=defaults_0,
-            defaults_1=defaults_user,
+            defaults_ws=defaults_ws,
             platform_name=apartment_portal_name,
             url_platform=url,
             path_savefile_0=path_savefile_0,
@@ -82,49 +81,56 @@ class WSMietwohnungsboerse(WohnungssucherBase):
 
         apartments_raw = []
         for html_apts_each in html_apts.children:
-            # load html of apartment
-            apt_raw = {}
             url_part = html_apts_each.children[1].children[0].attributes['href']
-            url = self.parse_url(self.url_platform, url_part)
-            if url is None:
-                self.log_error('fCould not load apartment from url "{url}". Invalid url format. Skipping apartment.')
-            html_apt = self.request_url(url)
-            if html_apt is None:
-                self.log_error(f'Could not load apartment from url "{url}". '
-                               f'Status code different than 200. Skipping apartment')
-                continue
-            apt_raw['url'] = url
+            url_apt = self.parse_url(self.url_platform, url_part)
+            apt_raw = self.request_apartment(url_apt)
 
-            # extract title
-            html_apt_title = html_apt.get_elements_by_class('objektTitel h2')
-            if len(html_apt_title) != 1:
-                self.log_error_html_content_not_found('class', 'objektTitel h2')
-            apt_raw['description'] = html_apt_title[0].inner_html
-
-            # extract apartment attributes
-            html_apt_attrs = html_apt.get_elements_by_class('objektDatenTabelle')
-            if len(html_apt_attrs) != 1:
-                self.log_error_html_content_not_found('class', 'objektDatenTabelle')
-            html_apt_attrs = html_apt_attrs[0]
-            html_apt_attrs_gen = html_apt_attrs.children[0].children[0].children[0]
-
-            apt_raw['id'] = html_apt_attrs_gen.children[0].children[0].children[0].inner_html[11:]
-
-            for html_apt_attrs_gen_i in html_apt_attrs_gen.children[1:]:
-                for line in html_apt_attrs_gen_i.children:
-                    for cell in line.children:
-                        if cell.attributes['class'] == 'clear':
-                            continue
-                        attr_name = cell.children[0].inner_html
-                        attr_value = cell.children[1].inner_html
-                        apt_raw[attr_name] = attr_value
-
-            apartments_raw.append(apt_raw)
+            if apt_raw is not None:
+                apartments_raw.append(apt_raw)
 
         return apartments_raw
 
-    # def request_apartment(self, url: str) -> dict:
-    #     pass
+    def request_apartment(self, url: str) -> dict | None:
+        # load html of apartment
+        apt_raw = {}
+
+        if url is None:
+            self.log_error(f'Could not load apartment from url "{url}". Invalid url format. Skipping apartment.')
+
+        html_apt = self.request_url(url)
+        if html_apt is None:
+            self.log_error(f'Could not load apartment from url "{url}". '
+                           f'Status code different than 200. Skipping apartment')
+            return None
+        apt_raw['url'] = url
+
+        # extract title
+        html_apt_title = html_apt.get_elements_by_class('objektTitel h2')
+        if len(html_apt_title) != 1:
+            self.log_error_html_content_not_found('class', 'objektTitel h2', add_skip_apartment=True)
+            return None
+        apt_raw['description'] = html_apt_title[0].inner_html
+
+        # extract apartment attributes
+        html_apt_attrs = html_apt.get_elements_by_class('objektDatenTabelle')
+        if len(html_apt_attrs) != 1:
+            self.log_error_html_content_not_found('class', 'objektDatenTabelle', add_skip_apartment=True)
+            return None
+        html_apt_attrs = html_apt_attrs[0]
+        html_apt_attrs_gen = html_apt_attrs.children[0].children[0].children[0]
+
+        apt_raw['id'] = html_apt_attrs_gen.children[0].children[0].children[0].inner_html[11:]
+
+        for html_apt_attrs_gen_i in html_apt_attrs_gen.children[1:]:
+            for line in html_apt_attrs_gen_i.children:
+                for cell in line.children:
+                    if cell.attributes['class'] == 'clear':
+                        continue
+                    attr_name = cell.children[0].inner_html
+                    attr_value = cell.children[1].inner_html
+                    apt_raw[attr_name] = attr_value
+
+        return apt_raw
 
     def map_apt_keys(self, apts_raw: list[dict]) -> list[dict]:
         apts_dicts = []

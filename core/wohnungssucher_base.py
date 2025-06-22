@@ -76,8 +76,7 @@ class WohnungssucherBase:
     def __init__(
             self,
             config_user: dict,
-            defaults_0: dict,
-            defaults_1: dict,
+            defaults_ws: dict,
             platform_name: str,
             url_platform: str,
             path_savefile_0: str,
@@ -93,8 +92,8 @@ class WohnungssucherBase:
         self.path_savefile_1 = path_savefile_1
         self.path_logfile = path_logfile
 
-        self.defaults_0 = defaults_0
-        self.defaults_1 = defaults_1
+        self.defaults_0 = defaults_ws
+        self.defaults_1 = config_user['defaults_user']
 
         self.exp_keys_apts_raw = exp_keys_apts_raw
 
@@ -132,7 +131,7 @@ class WohnungssucherBase:
 
         print('\n' + self.platform_name)
         print(f'New apartments: {new_apts_0}')
-        print(f'Further apartments: {new_apts_1}')
+        print(f'Further apartments: {new_apts_1}\n')
 
     def set_configurations(self, config: dict):
         self.zips_included = config['zips_included']
@@ -308,7 +307,7 @@ class WohnungssucherBase:
 
             try:
                 if apt_dict['floor'] is not None:
-                    apt_dict['floor'] = int(apt_dict['floor'])
+                    apt_dict['floor'] = self.parse_int_from_floor(apt_dict['floor'])
             except (ValueError, TypeError):
                 apt_dict['floor'] = None
                 value = apt_dict['floor']
@@ -548,9 +547,21 @@ class WohnungssucherBase:
         if isinstance(apt_size, float):
             return apt_size
         try:
-            apt_size_float = re.findall('[\d.,]+', apt_size)[0]
+            apt_size_float = re.findall('\d[\d.,]*', apt_size)[0]
             apt_size_float = float(apt_size_float.replace(',', '.'))
             return apt_size_float
+        except:
+            raise TypeError
+
+    @staticmethod
+    def parse_int_from_floor(floor: str | int) -> int:
+        if isinstance(floor, int):
+            return floor
+        if floor.strip() in ['EG', 'Erdgeschoss']:
+            return 0
+        try:
+            floor_int = int(re.findall('\d+', floor)[0])
+            return floor_int
         except:
             raise TypeError
 
@@ -572,13 +583,20 @@ class WohnungssucherBase:
         print(msg, file=sys.stderr)
 
 
-    def log_error_html_content_not_found(self, content_type: str, content: str, critical: bool = False):
+    def log_error_html_content_not_found(
+            self,
+            content_type: str,
+            content: str,
+            add_skip_apartment: bool = False,
+            critical: bool = False
+    ):
         err_msg = (f'None or multiple instances of {content_type} "{content}" in response. '
                    f'Expected exactly one instance. Maybe webpage has been modified?')
         if critical:
             raise ValueError(err_msg)
         else:
-            err_msg += ' Skipped apartment!'
+            if add_skip_apartment:
+                err_msg += ' Skipping apartment!'
             self.log_error(err_msg)
 
 

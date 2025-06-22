@@ -31,14 +31,11 @@ def load_configuration():
         'max_apartment_age': user_configuration.max_apartment_age,
         'email_from_address': user_configuration.email_from_address,
         'email_to_address': user_configuration.email_to_address,
-        'email_send_status': user_configuration.email_send_status
+        'email_send_status': user_configuration.email_send_status,
+        'defaults_user': user_configuration.defaults
     }
 
-    defaults = {
-        'mietwohnungsboerse': user_configuration.defaults_mietwohnungsboerse
-    }
-
-    return config, defaults
+    return config
 
 
 def send_mail(from_addr: str, to_addr: str, subject: str, msg_plain: str = '', msg_html: str = ''):

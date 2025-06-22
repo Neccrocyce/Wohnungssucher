@@ -8,6 +8,7 @@ import user_configuration
 from apartment import Apartment
 from utils import send_mail, send_error_mail, load_configuration
 from wohnungssucher_platforms.ws_mietwohnungsboerse import WSMietwohnungsboerse
+from ws_gvg import WSGVG
 
 
 def filter_new_apts(apts: list[Apartment]) -> list[Apartment]:
@@ -35,9 +36,10 @@ def filter_new_errors(errors: list[dict]) -> list[dict]:
 
 if __name__ == '__main__':
     platforms = [
+        ('gvg', WSGVG),
         ('mietwohnungsboerse', WSMietwohnungsboerse)
     ]
-    config, defaults = load_configuration()
+    config = load_configuration()
 
     # send weekly status report if monday
     if config['email_send_status'] and datetime.now().weekday() == 0:
@@ -47,7 +49,6 @@ if __name__ == '__main__':
         report = {
             'Status': 'running',
             'User Settings': config_dict,
-            'User Settings Defaults': defaults,
             'Apartment Portals': [x[0] for x in platforms]
         }
 
@@ -57,7 +58,7 @@ if __name__ == '__main__':
         num_noncritical_errors = 0
 
         for desc, func in platforms:
-            platform = func(config, defaults[desc])
+            platform = func(config)
             apts_0 = filter_new_apts(platform.load_apartments(platform.path_savefile_0))
             apts_1 = filter_new_apts(platform.load_apartments(platform.path_savefile_1))
             errors = filter_new_errors(platform.load_errors())
@@ -106,7 +107,7 @@ if __name__ == '__main__':
 
     # look for new apartments
     for desc, cls in platforms:
-        platform = cls(config, defaults[desc])
+        platform = cls(config)
         try:
             platform()
         except:

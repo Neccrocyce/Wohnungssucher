@@ -22,7 +22,17 @@ class WSTest(WohnungssucherBase):
     def __init__(self, config, defaults_user):
         path_savefile_0 = str(os.path.join(config['path_files'], 'tests_0.json'))
         path_savefile_1 = str(os.path.join(config['path_files'], 'tests_1.json'))
-        super().__init__(config, defaults_0, defaults_user,'dummy_url_ws_test', path_savefile_0, path_savefile_1)
+        path_logfile = str(os.path.join(config['path_files'], 'tests_error.json'))
+        super().__init__(
+            config,
+            defaults_0,
+            'dummy_url_ws_test',
+            '',
+            path_savefile_0,
+            path_savefile_1,
+            path_logfile,
+            []
+        )
 
     def request_all_apartments(self) -> list[Apartment]:
         apartments = []

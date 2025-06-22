@@ -104,7 +104,7 @@ year of construction (Baujahr)
 Exchange Apartment (Tauschwohnung)
 """
 
-defaults_mietwohnungsboerse = {
+defaults = {
     'zip': True,
     'place': True,
     'rent_cold': True,
