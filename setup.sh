@@ -21,7 +21,7 @@ fi
 # Copy service files
 echo "Copying $SERVICE_SERVICE and $SERVICE_SERVICE_TIMER to $SERVICE_DIR"
 for SERVICE_FILE in "$SERVICE_SERVICE" "$SERVICE_TIMER"; do
-    if [ -f "$SERVICE_FILE" ]; then
+    if [ ! -f "$SERVICE_DIR/$SERVICE_FILE" ]; then
         sudo cp "$SERVICE_FILE" "$SERVICE_DIR/"
     else
         echo "Service file $SERVICE_FILE already exists"
@@ -30,6 +30,7 @@ done
 
 # Copy source files
 echo "Copying Source files to $PROGRAM_DIR"
+[ ! -d $$PROGRAM_DIR ] && mkdir $PROGRAM_DIR
 sudo cp -r "core/" "$PROGRAM_DIR/core/"
 sudo cp -r "wohnungssucher_platforms/" "$PROGRAM_DIR/wohnungssucher_platforms/"
 sudo cp "main.py" "$PROGRAM_DIR/"
