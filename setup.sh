@@ -30,7 +30,7 @@ done
 
 # Copy source files
 echo "Copying Source files to $PROGRAM_DIR"
-[ ! -d $$PROGRAM_DIR ] && mkdir $PROGRAM_DIR
+[ ! -d $$PROGRAM_DIR ] && sudo mkdir $PROGRAM_DIR
 sudo cp -r "core/" "$PROGRAM_DIR/core/"
 sudo cp -r "wohnungssucher_platforms/" "$PROGRAM_DIR/wohnungssucher_platforms/"
 sudo cp "main.py" "$PROGRAM_DIR/"
