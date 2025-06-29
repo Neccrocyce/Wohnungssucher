@@ -30,7 +30,7 @@ done
 
 # Copy source files
 echo "Copying Source files to $PROGRAM_DIR"
-if [ ! -d $$PROGRAM_DIR ]; then
+if [ ! -d $PROGRAM_DIR ]; then
     sudo mkdir $PROGRAM_DIR
 fi
 sudo cp -r "core/" "$PROGRAM_DIR/core/"
