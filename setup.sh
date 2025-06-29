@@ -8,7 +8,7 @@ USERNAME="wsuser"
 SERVICE_SERVICE="wohnungssucher.service"
 SERVICE_TIMER="wohnungssucher.timer"
 SERVICE_DIR="/etc/systemd/system"
-PROGRAM_DIR="/usr/bin/wohnungssucher"
+PROGRAM_DIR="/opt/wohnungssucher"
 
 # Create user wsuser without home directory
 if id "$USERNAME" &>/dev/null; then
@@ -21,7 +21,11 @@ fi
 # Copy service files
 echo "Copying $SERVICE_SERVICE and $SERVICE_SERVICE_TIMER to $SERVICE_DIR"
 for SERVICE_FILE in "$SERVICE_SERVICE" "$SERVICE_TIMER"; do
-    sudo cp "$SERVICE_FILE" "$SERVICE_DIR/"
+    if [ -f "$SERVICE_FILE" ]; then
+        sudo cp "$SERVICE_FILE" "$SERVICE_DIR/"
+    else
+        echo "Service file $SERVICE_FILE already exists"
+    fi
 done
 
 # Copy source files
