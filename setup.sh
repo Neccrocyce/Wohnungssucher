@@ -26,8 +26,8 @@ done
 
 # Copy source files
 echo "Copying Source files to $PROGRAM_DIR"
-sudo cp -r "core/" "$PROGRAM_DIR/"
-sudo cp -r "wohnungssucher_platforms/" "$PROGRAM_DIR/"
+sudo cp -r "core/" "$PROGRAM_DIR/core/"
+sudo cp -r "wohnungssucher_platforms/" "$PROGRAM_DIR/wohnungssucher_platforms/"
 sudo cp "main.py" "$PROGRAM_DIR/"
 sudo cp "mail_tester.py" "$PROGRAM_DIR/"
 sudo cp "user_configuration.py" "$PROGRAM_DIR/"
