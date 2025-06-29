@@ -1,10 +1,8 @@
 [Unit]
 Description=Wohnungssucher
-OnFailure=
 
 [Service]
 User=wsuser
 Type=oneshot
 ExecStart=/usr/bin/python3 /usr/bin/wohnungssucher/main.py
-RuntimeMaxSec=3600
 
