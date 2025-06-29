@@ -7,10 +7,9 @@ from datetime import datetime, time
 
 import requests
 
-import utils
 from core.HtmlDecoder import HtmlDocument
 from core.apartment import Apartment
-from core.utils import BoolPlus
+from core.utils import BoolPlus, send_mail
 
 
 class WohnungssucherBase:
@@ -459,7 +458,7 @@ class WohnungssucherBase:
 
         subject = f'Neue Wohnungen bei {self.platform_name}'
 
-        utils.send_mail(self.email_from_addr, self.email_to_addr, subject, msg_html=email_content)
+        send_mail(self.email_from_addr, self.email_to_addr, subject, msg_html=email_content)
 
     def load_errors(self) -> list[dict]:
         """
