@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer starting the wohnungssucher.service daily at 14:00
+After=network.target
+
+[Timer]
+Unit=wohnungssucher.service
+OnCalendar=*-*-* 14:00:00
+
+[Install]
+WantedBy=timers.target

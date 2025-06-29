@@ -143,3 +143,7 @@ email_to_address: str | None = None
 # Whether to send weekly reports summarizing application status and any encountered errors.
 # Critical errors trigger immediate email notifications.
 email_send_status: bool = False
+
+# Whether to only send an email listing new apartment if there are new apartments available.
+# If set to False an email will be sent after each run (by default: daily) even if there are no new apartments available.
+notify_on_new_apartments_only: bool = True

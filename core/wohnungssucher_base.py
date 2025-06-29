@@ -67,6 +67,8 @@ class WohnungssucherBase:
     email_from_addr: str
     email_to_addr: str | None
 
+    notify_on_new_apartments_only: bool
+
     # all expected keys in raw apartment dictionary which is returned by request_all_apartments_raw
     exp_keys_apts_raw: list[str]
 
@@ -207,6 +209,7 @@ class WohnungssucherBase:
 
         self.email_from_addr = config['email_from_address']
         self.email_to_addr = config['email_to_address']
+        self.notify_on_new_apartments_only = config['notify_on_new_apartments_only']
 
 
     @abstractmethod
@@ -430,6 +433,10 @@ class WohnungssucherBase:
         :return:
         """
         if self.email_to_addr is None:
+            return
+
+        # if no new apartments
+        if not apartments_0 and not apartments_1 and self.notify_on_new_apartments_only:
             return
 
         if len(apartments_0) == 0:
