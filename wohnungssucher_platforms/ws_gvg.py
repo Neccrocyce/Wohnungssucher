@@ -18,7 +18,7 @@ default_exchange_apartment: No
 import os
 import re
 
-from wohnungssucher_base import WohnungssucherBase
+from core.wohnungssucher_base import WohnungssucherBase
 
 defaults_ws = {
     'zip': False,

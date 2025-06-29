@@ -4,11 +4,11 @@ import sys
 import traceback
 from datetime import datetime, time
 
-from apartment import Apartment
-from config_loader import load_configuration
-from utils import send_mail, send_error_mail
+from core.apartment import Apartment
+from core.config_loader import load_configuration
+from core.utils import send_mail, send_error_mail
 from wohnungssucher_platforms.ws_mietwohnungsboerse import WSMietwohnungsboerse
-from ws_gvg import WSGVG
+from wohnungssucher_platforms.ws_gvg import WSGVG
 
 
 def filter_new_apts(apts: list[Apartment]) -> list[Apartment]:

@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from config_loader import load_configuration
-from utils import send_mail
+from core.config_loader import load_configuration
+from core.utils import send_mail
 
 if __name__ == '__main__':
     config = load_configuration()
