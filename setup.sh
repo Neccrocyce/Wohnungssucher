@@ -33,11 +33,11 @@ echo "Copying Source files to $PROGRAM_DIR"
 if [ ! -d $PROGRAM_DIR ]; then
     sudo mkdir $PROGRAM_DIR
 fi
-sudo cp -r "core/" "$PROGRAM_DIR/core/"
-sudo cp -r "wohnungssucher_platforms/" "$PROGRAM_DIR/wohnungssucher_platforms/"
-sudo cp "main.py" "$PROGRAM_DIR/"
-sudo cp "mail_tester.py" "$PROGRAM_DIR/"
-sudo cp "user_configuration.py" "$PROGRAM_DIR/"
+sudo cp -rf "core/" "$PROGRAM_DIR/core/"
+sudo cp -rf "wohnungssucher_platforms/" "$PROGRAM_DIR/wohnungssucher_platforms/"
+sudo cp -f "main.py" "$PROGRAM_DIR/"
+sudo cp -f "mail_tester.py" "$PROGRAM_DIR/"
+sudo cp -f "user_configuration.py" "$PROGRAM_DIR/"
 
 # Reload systemd
 echo "Reloading systemd daemon..."
