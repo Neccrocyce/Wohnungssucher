@@ -435,7 +435,8 @@ class WohnungssucherBase:
             return
 
         # if no new apartments
-        if not apartments_0 and not apartments_1 and self.notify_on_new_apartments_only:
+        is_new_apts = apartments_0 or apartments_1
+        if not is_new_apts and self.notify_on_new_apartments_only:
             return
 
         if len(apartments_0) == 0:
@@ -456,7 +457,10 @@ class WohnungssucherBase:
                 email_content += apt_1.to_html()[1]
         email_content += '</body>\n</html>'
 
-        subject = f'Neue Wohnungen bei {self.platform_name}'
+        if is_new_apts:
+            subject = f'Neue Wohnungen bei {self.platform_name}'
+        else:
+            subject = f'Keine neuen Wohnungen bei {self.platform_name}'
 
         send_mail(self.email_from_addr, self.email_to_addr, subject, msg_html=email_content)
 
