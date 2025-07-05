@@ -3,6 +3,13 @@
 # Exit on errors
 set -e
 
+# Parameters
+if [ "$1" == "overwrite" ]; then
+    owrite=true
+else
+    owrite=false
+fi
+
 # --- CONFIGURATION ---
 USERNAME="wsuser"
 SERVICE_SERVICE="wohnungssucher.service"
@@ -21,7 +28,7 @@ fi
 # Copy service files
 echo "Copying $SERVICE_SERVICE and $SERVICE_SERVICE_TIMER to $SERVICE_DIR"
 for SERVICE_FILE in "$SERVICE_SERVICE" "$SERVICE_TIMER"; do
-    if [ ! -f "$SERVICE_DIR/$SERVICE_FILE" ]; then
+    if [ ! -f "$SERVICE_DIR/$SERVICE_FILE" ] || [ "$owrite" = true ]; then
         sudo cp "$SERVICE_FILE" "$SERVICE_DIR/"
     else
         echo "Service file $SERVICE_FILE already exists"
